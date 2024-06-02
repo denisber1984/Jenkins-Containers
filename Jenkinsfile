@@ -1,9 +1,32 @@
 pipeline {
-    agent { label 'master' }
+    agent any
     stages {
-        stage('build') {
+        stage('Checkout') {
             steps {
-                echo "Hello World!"
+                checkout([$class: 'GitSCM',
+                    branches: [[name: '*/main']],
+                    userRemoteConfigs: [[url: 'https://github.com/denisber1984/Jenkins-Containers.git']]
+                ])
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'echo "Building..."'
+            }
+        }
+        stage('Test') {
+            steps {
+                sh 'echo "Running tests..."'
+            }
+        }
+        stage('Deploy') {
+            steps {
+                sh 'echo "Deploying..."'
+            }
+        }
+        stage('Verify') {
+            steps {
+                sh 'echo "Pipeline works!"'
             }
         }
     }
