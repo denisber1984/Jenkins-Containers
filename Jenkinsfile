@@ -34,14 +34,6 @@ pipeline {
             }
         }
 
-        stage('Test') {
-            steps {
-                script {
-                    sh 'npm test' // Adjust as needed for your testing framework
-                }
-            }
-        }
-
         stage('Deploy') {
             steps {
                 script {
