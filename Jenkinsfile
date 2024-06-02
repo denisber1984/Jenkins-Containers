@@ -1,12 +1,9 @@
 pipeline {
-    agent any
+    agent { label 'master' }
     stages {
         stage('build') {
             steps {
-                sh 'echo "Hello World"'
-
-                    echo "Hwello again"
-                    ls -lah
+                echo "Hello World!"
             }
         }
     }
