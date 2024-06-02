@@ -6,7 +6,7 @@ import subprocess
 
 app = flask.Flask(__name__)
 
-TELEGRAM_TOKEN = ' '
+TELEGRAM_TOKEN = '6450536748:AAFWFl-9OifT_RKd7ptomB5bGdJBMK8g14s'
 TELEGRAM_APP_URL = 'https://t.me/den1984ber_bot'
 
 
