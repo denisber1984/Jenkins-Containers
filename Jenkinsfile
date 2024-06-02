@@ -21,7 +21,7 @@ pipeline {
                             echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
 
                             # Build the Docker image
-                            docker build -t polybot-app .
+                            docker build -t polybot-app -f polybot/Dockerfile polybot/
 
                             # Tag the Docker image
                             docker tag polybot-app:latest $DOCKERHUB_REPOSITORY:latest
