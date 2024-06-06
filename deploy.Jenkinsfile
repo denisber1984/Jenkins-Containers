@@ -10,14 +10,14 @@ pipeline {
             steps {
                 echo "Deploying PolyBot app with image: ${params.polybot_URL}"
                 sshagent(['ec2-ssh-credentials']) {
-                    sh '''
-                        ssh -o StrictHostKeyChecking=no ec2-user@18.197.90.144 <<EOF
+                    sh """
+                        ssh -o StrictHostKeyChecking=no ec2-user@18.197.90.144 << 'EOF'
                         docker pull ${params.polybot_URL}
                         docker stop polybot || true
                         docker rm polybot || true
                         docker run -d -p 8443:8443 --name polybot ${params.polybot_URL}
                         EOF
-                    '''
+                    """
                 }
             }
         }
