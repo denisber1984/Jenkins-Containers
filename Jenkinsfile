@@ -3,6 +3,8 @@ pipeline {
 
     environment {
         DOCKERHUB_REPOSITORY = 'denisber1984/polybot_app'
+        IMAGE_NAME = 'denisber1984/polybot_app'
+        IMAGE_TAG = 'latest'
     }
 
     stages {
@@ -21,16 +23,24 @@ pipeline {
                             echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
 
                             # Build the Docker image
-                            docker build -t polybot-app -f polybot/Dockerfile polybot/
+                            docker build -t ${IMAGE_NAME} -f polybot/Dockerfile polybot/
 
                             # Tag the Docker image
-                            docker tag polybot-app:latest $DOCKERHUB_REPOSITORY:latest
+                            docker tag ${IMAGE_NAME}:latest ${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}
 
                             # Push the Docker image to DockerHub
-                            docker push $DOCKERHUB_REPOSITORY:latest
+                            docker push ${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}
                         '''
                     }
                 }
+            }
+        }
+
+        stage('Trigger Deploy') {
+            steps {
+                build job: 'PolyBot_Deploy', wait: false, parameters: [
+                    string(name: 'polybot_URL', value: "${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}")
+                ]
             }
         }
 
