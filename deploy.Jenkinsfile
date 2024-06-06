@@ -16,7 +16,7 @@ pipeline {
                         docker stop polybot || true
                         docker rm polybot || true
                         docker run -d -p 8443:8443 --name polybot ${params.polybot_URL}
-                        EOF
+EOF
                     """
                 }
             }
