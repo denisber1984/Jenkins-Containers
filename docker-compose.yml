@@ -1,0 +1,21 @@
+version: '3'
+
+services:
+  app:
+    build:
+      context: ./polybot
+      dockerfile: Dockerfile  # Dockerfile for the Python app
+    ports:
+      - "8443:8443"
+    volumes:
+      - ./polybot:/usr/src/app
+    environment:
+      - TELEGRAM_TOKEN=${TELEGRAM_TOKEN}
+      - TELEGRAM_APP_URL=https://t.me/den1984ber_bot
+
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile  # Dockerfile for the static website
+    ports:
+      - "80:80"

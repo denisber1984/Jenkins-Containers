@@ -16,9 +16,8 @@ COPY . .
 # Make port 8443 available to the world outside this container
 EXPOSE 8443
 
-# Define environment variable
-ENV TELEGRAM_TOKEN=<your_telegram_token>
-ENV TELEGRAM_APP_URL=https://t.me/den1984ber_bot
+# Define environment variable for Flask
+ENV FLASK_APP=app.py
 
 # Run the app when the container launches
-CMD ["python", "app.py"]
+CMD ["flask", "run", "--host=0.0.0.0", "--port=8443"]
