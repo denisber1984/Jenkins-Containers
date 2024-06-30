@@ -1,57 +1,47 @@
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'denisber1984/jenkins-agent:latest'
+            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     environment {
-        DOCKERHUB_REPOSITORY = 'denisber1984/polybot_app'
-        IMAGE_NAME = 'denisber1984/polybot_app'
-        IMAGE_TAG = 'latest'
+        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials') // Replace with your Docker Hub credentials ID
+        GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git' // Your GitHub repo URL
+        DOCKER_IMAGE = 'denisber1984/mypolybot-app:latest'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                git branch: 'main', url: 'https://github.com/denisber1984/Jenkins-Containers.git'
+                // Checkout code from GitHub
+                git url: "${GITHUB_REPO}"
             }
         }
 
-        stage('Build Bot app') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKERHUB_USERNAME', passwordVariable: 'DOCKERHUB_PASSWORD')]) {
-                        sh '''
-                            # Log in to DockerHub
-                            echo $DOCKERHUB_PASSWORD | docker login --username $DOCKERHUB_USERNAME --password-stdin
+                    docker.build("${DOCKER_IMAGE}", '-f Polybot/Dockerfile ./Polybot')
+                }
+            }
+        }
 
-                            # Build the Docker image
-                            docker build -t ${IMAGE_NAME} -f polybot/Dockerfile polybot/
-
-                            # Tag the Docker image
-                            docker tag ${IMAGE_NAME}:latest ${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}
-
-                            # Push the Docker image to DockerHub
-                            docker push ${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}
-                        '''
+        stage('Push Docker Image') {
+            steps {
+                script {
+                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                        docker.image("${DOCKER_IMAGE}").push()
                     }
                 }
             }
         }
 
-        stage('Trigger Deploy') {
-            steps {
-                build job: 'PolyBot_Deploy', wait: false, parameters: [
-                    string(name: 'polybot_URL', value: "${DOCKERHUB_REPOSITORY}:${IMAGE_TAG}")
-                ]
-            }
-        }
-
         stage('Deploy') {
             steps {
-                script {
-                    sh '''
-                    echo "Deploying to production..."
-                    # Add your deployment steps here
-                    '''
-                }
+                echo 'Deploy stage - customize as needed'
+                // Add deployment steps here if necessary
             }
         }
     }
@@ -59,12 +49,6 @@ pipeline {
     post {
         always {
             cleanWs()
-        }
-        success {
-            echo 'Build succeeded!'
-        }
-        failure {
-            echo 'Build failed!'
         }
     }
 }
