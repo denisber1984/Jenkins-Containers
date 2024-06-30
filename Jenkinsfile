@@ -19,6 +19,7 @@ pipeline {
                 // Checkout code from GitHub
                 git url: "${GITHUB_REPO}", branch: 'main', credentialsId: 'github-credentials'
                 script {
+                    sh 'git config --global --add safe.directory /var/lib/jenkins/workspace/mypolybot-pipeline'
                     env.GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 }
             }
