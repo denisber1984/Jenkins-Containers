@@ -10,7 +10,7 @@ pipeline {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
         GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
         GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git' // Your GitHub repo URL
-        DOCKER_IMAGE = 'denisber1984/mypolybot-app:latest'
+        DOCKER_IMAGE = 'denisber1984/mypolybot-app'
     }
 
     stages {
@@ -18,23 +18,24 @@ pipeline {
             steps {
                 // Checkout code from GitHub
                 git url: "${GITHUB_REPO}", branch: 'main', credentialsId: 'github-credentials'
-            }
-        }
-
-        stage('Build Docker Image') {
-            steps {
                 script {
-                    docker.build("${DOCKER_IMAGE}", '-f polybot/Dockerfile ./polybot')
+                    env.GIT_COMMIT_SHORT = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Build and Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
-                        docker.image("${DOCKER_IMAGE}").push()
-                    }
+                    def imageTag = "${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}"
+                    def latestTag = "latest"
+
+                    sh """
+                        docker login --username ${env.DOCKER_HUB_CREDENTIALS_USR} --password ${env.DOCKER_HUB_CREDENTIALS_PSW}
+                        docker build -t ${DOCKER_IMAGE}:${imageTag} -t ${DOCKER_IMAGE}:${latestTag} -f polybot/Dockerfile ./polybot
+                        docker push ${DOCKER_IMAGE}:${imageTag}
+                        docker push ${DOCKER_IMAGE}:${latestTag}
+                    """
                 }
             }
         }
