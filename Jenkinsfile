@@ -7,7 +7,7 @@ pipeline {
     }
 
     environment {
-        DOCKER_HUB_CREDENTIALS = credentials('docker-hub-credentials') // Replace with your Docker Hub credentials ID
+        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Updated to use the correct credentials ID
         GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git' // Your GitHub repo URL
         DOCKER_IMAGE = 'denisber1984/mypolybot-app:latest'
     }
@@ -31,7 +31,7 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'docker-hub-credentials') {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
                         docker.image("${DOCKER_IMAGE}").push()
                     }
                 }
@@ -48,7 +48,9 @@ pipeline {
 
     post {
         always {
-            cleanWs()
+            node {
+                cleanWs()
+            }
         }
     }
 }
