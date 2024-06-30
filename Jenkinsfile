@@ -7,7 +7,8 @@ pipeline {
     }
 
     environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Updated to use the correct credentials ID
+        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
+        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
         GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git' // Your GitHub repo URL
         DOCKER_IMAGE = 'denisber1984/mypolybot-app:latest'
     }
@@ -16,7 +17,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 // Checkout code from GitHub
-                git url: "${GITHUB_REPO}"
+                git url: "${GITHUB_REPO}", branch: 'main', credentialsId: 'github-credentials'
             }
         }
 
