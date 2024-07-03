@@ -6,6 +6,12 @@ pipeline {
         }
     }
 
+    options {
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
     environment {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
         GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
@@ -51,6 +57,14 @@ pipeline {
 
     post {
         always {
+            script {
+                // Clean up the built Docker images from the disk
+                sh """
+                    docker rmi ${DOCKER_IMAGE}:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT} || true
+                    docker rmi ${DOCKER_IMAGE}:latest || true
+                """
+            }
+            // Clean the workspace
             cleanWs()
         }
     }
