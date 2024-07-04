@@ -2,27 +2,26 @@ pipeline {
     agent {
         docker {
             image 'denisber1984/jenkins-agent:latest'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
+            args '-u root:root -v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
     environment {
-        DOCKER_CREDENTIALS_ID = 'dockerhub-credentials'
-        GIT_CREDENTIALS_ID = 'github-credentials'
-        SNYK_TOKEN = credentials('snyk-token')
+        DOCKERHUB_CREDENTIALS = credentials('dockerhub')
+        GITHUB_CREDENTIALS = credentials('github-credentials')
+        SNYK_TOKEN = credentials('snyk-api-token')
     }
     stages {
         stage('Checkout') {
             steps {
-                checkout([$class: 'GitSCM', branches: [[name: '*/main']], userRemoteConfigs: [[url: 'https://github.com/denisber1984/Jenkins-Containers.git', credentialsId: env.GIT_CREDENTIALS_ID]]])
+                git credentialsId: 'github-credentials', url: 'https://github.com/denisber1984/Jenkins-Containers.git'
             }
         }
         stage('Build and Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', env.DOCKER_CREDENTIALS_ID) {
-                        def app = docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}")
-                        app.push()
-                        app.push('latest')
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
+                        sh 'docker build -t denisber1984/mypolybot-app:latest .'
+                        sh 'docker push denisber1984/mypolybot-app:latest'
                     }
                 }
             }
@@ -34,7 +33,7 @@ pipeline {
         }
         stage('Snyk Security Scan') {
             steps {
-                withCredentials([string(credentialsId: 'snyk-token', variable: 'SNYK_TOKEN')]) {
+                withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
                     sh 'snyk auth $SNYK_TOKEN'
                     sh 'snyk test'
                 }
