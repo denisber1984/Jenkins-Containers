@@ -22,9 +22,9 @@ pipeline {
         }
         stage('Build and Push Docker Image') {
             steps {
-                withCredentials([string(credentialsId: 'dockerhub', variable: 'DOCKER_HUB_CREDENTIALS')]) {
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USERNAME', passwordVariable: 'DOCKER_PASSWORD')]) {
                     sh """
-                        docker login --username denisber1984 --password-stdin <<< "${DOCKER_HUB_CREDENTIALS}"
+                        echo ${DOCKER_PASSWORD} | docker login --username ${DOCKER_USERNAME} --password-stdin
                         docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER}-${gitCommit} -t ${DOCKER_IMAGE}:latest -f polybot/Dockerfile ./polybot
                         docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}-${gitCommit}
                         docker push ${DOCKER_IMAGE}:latest
@@ -51,8 +51,14 @@ pipeline {
     post {
         always {
             cleanWs()
-            sh 'docker rmi ${DOCKER_IMAGE}:${BUILD_NUMBER}-${gitCommit}'
-            sh 'docker rmi ${DOCKER_IMAGE}:latest'
+            script {
+                try {
+                    sh 'docker rmi ${DOCKER_IMAGE}:${BUILD_NUMBER}-${gitCommit}'
+                    sh 'docker rmi ${DOCKER_IMAGE}:latest'
+                } catch (Exception e) {
+                    echo "Error during cleanup: ${e}"
+                }
+            }
         }
     }
 }
