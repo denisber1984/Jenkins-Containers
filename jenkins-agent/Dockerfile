@@ -22,7 +22,7 @@ COPY --from=docker /usr/local/bin/docker /usr/local/bin/
 # Copy the AWS CLI and Snyk from the installer image
 COPY --from=installer /usr/local/aws-cli/ /usr/local/aws-cli/
 COPY --from=installer /aws-cli-bin/ /usr/local/bin/
-COPY --from=installer /snyk/ /usr/local/bin/snyk
+COPY --from=installer /snyk/snyk /usr/local/bin/
 
 # Install Python
 USER root
