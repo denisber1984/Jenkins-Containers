@@ -8,11 +8,16 @@ pipeline {
     environment {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub')
         GITHUB_CREDENTIALS = credentials('github-credentials')
+        SNYK_TOKEN = credentials('snyk-api-token')
+        SNYK_API = 'https://snyk.io/api' // Set to your custom endpoint if different
     }
     options {
         buildDiscarder(logRotator(daysToKeepStr: '30'))
         disableConcurrentBuilds()
         timestamps()
+    }
+    tools {
+        snyk 'Snyk'  // This should match the name you gave to the Snyk tool installation
     }
     stages {
         stage('Checkout') {
@@ -37,12 +42,12 @@ pipeline {
         }
         stage('Snyk Security Scan') {
             steps {
-                snykSecurity test: [
-                    projectType: 'container',
-                    dockerImageName: 'denisber1984/mypolybot-app:latest',
-                    dockerFilePath: 'polybot/Dockerfile',
-                    severityThreshold: 'high'
-                ]
+                withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
+                    sh '''
+                    snyk auth ${SNYK_TOKEN}
+                    snyk container test denisber1984/mypolybot-app:latest --file=polybot/Dockerfile --severity-threshold=high
+                    '''
+                }
             }
         }
         stage('Deploy') {
