@@ -1,28 +1,20 @@
 pipeline {
-    agent {
-        docker {
-            image 'denisber1984/jenkins-agent:latest'
-            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
     environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub')
-        GITHUB_CREDENTIALS = credentials('github-credentials')
-        SNYK_TOKEN = credentials('snyk-api-token')
-        SNYK_API = 'https://snyk.io/api' // Set to your custom endpoint if different
+        DOCKER_IMAGE = 'denisber1984/mypolybot-app'
+    }
+    tools {
+        snyk 'Snyk'  // Ensure this matches the name you gave to the Snyk tool installation
     }
     options {
         buildDiscarder(logRotator(daysToKeepStr: '30'))
         disableConcurrentBuilds()
         timestamps()
     }
-    tools {
-        snyk 'Snyk'  // This should match the name you gave to the Snyk tool installation
-    }
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'github-credentials', url: 'https://github.com/denisber1984/Jenkins-Containers.git'
+                git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/denisber1984/Jenkins-Containers.git'
                 script {
                     gitCommit = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 }
@@ -30,23 +22,23 @@ pipeline {
         }
         stage('Build and Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub', passwordVariable: 'DOCKER_HUB_CREDENTIALS_PSW', usernameVariable: 'DOCKER_HUB_CREDENTIALS_USR')]) {
-                    sh '''
-                    docker login --username $DOCKER_HUB_CREDENTIALS_USR --password $DOCKER_HUB_CREDENTIALS_PSW
-                    docker build -t denisber1984/mypolybot-app:${BUILD_NUMBER}-${gitCommit} -t denisber1984/mypolybot-app:latest -f polybot/Dockerfile ./polybot
-                    docker push denisber1984/mypolybot-app:${BUILD_NUMBER}-${gitCommit}
-                    docker push denisber1984/mypolybot-app:latest
-                    '''
+                withCredentials([string(credentialsId: 'dockerhub', variable: 'DOCKER_HUB_CREDENTIALS')]) {
+                    sh """
+                        docker login --username denisber1984 --password-stdin <<< "${DOCKER_HUB_CREDENTIALS}"
+                        docker build -t ${DOCKER_IMAGE}:${BUILD_NUMBER}-${gitCommit} -t ${DOCKER_IMAGE}:latest -f polybot/Dockerfile ./polybot
+                        docker push ${DOCKER_IMAGE}:${BUILD_NUMBER}-${gitCommit}
+                        docker push ${DOCKER_IMAGE}:latest
+                    """
                 }
             }
         }
         stage('Snyk Security Scan') {
             steps {
                 withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
-                    sh '''
-                    snyk auth ${SNYK_TOKEN}
-                    snyk container test denisber1984/mypolybot-app:latest --file=polybot/Dockerfile --severity-threshold=high
-                    '''
+                    sh """
+                        snyk auth ${SNYK_TOKEN}
+                        snyk container test ${DOCKER_IMAGE}:latest --file=polybot/Dockerfile --severity-threshold=high
+                    """
                 }
             }
         }
@@ -59,10 +51,8 @@ pipeline {
     post {
         always {
             cleanWs()
-            script {
-                sh 'docker rmi denisber1984/mypolybot-app:${BUILD_NUMBER}-${gitCommit}'
-                sh 'docker rmi denisber1984/mypolybot-app:latest'
-            }
+            sh 'docker rmi ${DOCKER_IMAGE}:${BUILD_NUMBER}-${gitCommit}'
+            sh 'docker rmi ${DOCKER_IMAGE}:latest'
         }
     }
 }
