@@ -13,14 +13,20 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                git credentialsId: 'github-credentials', url: 'https://github.com/denisber1984/Jenkins-Containers.git'
+                script {
+                    checkout([$class: 'GitSCM', branches: [[name: '*/main']],
+                        doGenerateSubmoduleConfigurations: false,
+                        extensions: [[$class: 'CleanCheckout']],
+                        submoduleCfg: [],
+                        userRemoteConfigs: [[credentialsId: 'github-credentials', url: 'https://github.com/denisber1984/Jenkins-Containers.git']]])
+                }
             }
         }
         stage('Build and Push Docker Image') {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
-                        sh 'docker build -t denisber1984/mypolybot-app:latest .'
+                        sh 'docker build -t denisber1984/mypolybot-app:latest polybot'
                         sh 'docker push denisber1984/mypolybot-app:latest'
                     }
                 }
