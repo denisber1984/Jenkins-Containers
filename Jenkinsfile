@@ -34,15 +34,15 @@ pipeline {
         }
         stage('Verify Snyk Installation') {
             steps {
-                sh 'snyk --version'
+                sh '/usr/local/bin/snyk --version'
             }
         }
         stage('Snyk Security Scan') {
             steps {
                 withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
                     sh """
-                        snyk auth ${SNYK_TOKEN}
-                        snyk container test ${DOCKER_IMAGE}:latest --file=polybot/Dockerfile --severity-threshold=high
+                        /usr/local/bin/snyk auth ${SNYK_TOKEN}
+                        /usr/local/bin/snyk container test ${DOCKER_IMAGE}:latest --file=polybot/Dockerfile --severity-threshold=high
                     """
                 }
             }
