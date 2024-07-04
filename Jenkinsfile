@@ -41,6 +41,7 @@ pipeline {
         stage('Deploy') {
             steps {
                 // Your deployment steps here
+                echo 'Deploying the application...'
             }
         }
     }
