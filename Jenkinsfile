@@ -13,16 +13,15 @@ pipeline {
     }
 
     environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
-        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
-        GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git' // Your GitHub repo URL
+        DOCKER_HUB_CREDENTIALS = credentials('dockerhub')
+        GITHUB_CREDENTIALS = credentials('github-credentials')
+        GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git'
         DOCKER_IMAGE = 'denisber1984/mypolybot-app'
     }
 
     stages {
         stage('Checkout') {
             steps {
-                // Checkout code from GitHub
                 git url: "${GITHUB_REPO}", branch: 'main', credentialsId: 'github-credentials'
                 script {
                     sh 'git config --global --add safe.directory /var/lib/jenkins/workspace/mypolybot-pipeline'
@@ -47,10 +46,21 @@ pipeline {
             }
         }
 
+        stage('Snyk Security Scan') {
+            steps {
+                withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
+                    sh """
+                        snyk auth ${SNYK_TOKEN}
+                        # Scan the Docker image with severity threshold
+                        snyk container test ${DOCKER_IMAGE}:latest --file=polybot/Dockerfile --severity-threshold=high
+                    """
+                }
+            }
+        }
+
         stage('Deploy') {
             steps {
                 echo 'Deploy stage - customize as needed'
-                // Add deployment steps here if necessary
             }
         }
     }
@@ -58,14 +68,13 @@ pipeline {
     post {
         always {
             script {
-                // Clean up the built Docker images from the disk
                 sh """
                     docker rmi ${DOCKER_IMAGE}:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT} || true
                     docker rmi ${DOCKER_IMAGE}:latest || true
                 """
             }
-            // Clean the workspace
             cleanWs()
         }
     }
 }
+
