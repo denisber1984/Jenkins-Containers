@@ -32,6 +32,11 @@ pipeline {
                 }
             }
         }
+        stage('Verify Snyk Installation') {
+            steps {
+                sh 'snyk --version'
+            }
+        }
         stage('Snyk Security Scan') {
             steps {
                 withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
