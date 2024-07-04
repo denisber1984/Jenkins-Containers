@@ -40,7 +40,7 @@ pipeline {
         stage('Snyk Security Scan') {
             steps {
                 withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
-                    sh 'snyk auth $SNYK_TOKEN -d'
+                    sh 'snyk auth $SNYK_TOKEN --api=https://snyk.io/api -d'
                     sh 'snyk test'
                 }
             }
