@@ -18,7 +18,7 @@ pipeline {
             steps {
                 script {
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
-                        def app = docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}")
+                        def app = docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}", "polybot")
                         app.push("${env.BUILD_NUMBER}")
                         app.push("latest")
                     }
