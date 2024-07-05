@@ -8,7 +8,7 @@ pipeline {
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub')
         GITHUB_CREDENTIALS = credentials('github-credentials')
-        SNYK_API = '4e793fd6-8afb-49dc-bf3f-a3170cd08483'
+        SNYK_TOKEN = '4e793fd6-8afb-49dc-bf3f-a3170cd08483'
     }
     stages {
         stage('Checkout SCM') {
@@ -38,8 +38,8 @@ pipeline {
             steps {
                 withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
                     script {
-                        def snykScan = sh(script: 'snyk auth ${SNYK_TOKEN} --api=https://snyk.io/api -d', returnStatus: true)
-                        if (snykScan != 0) {
+                        def snykAuthStatus = sh(script: 'snyk auth ${SNYK_TOKEN} --api=https://snyk.io/api -d', returnStatus: true)
+                        if (snykAuthStatus != 0) {
                             error 'Snyk authentication failed'
                         } else {
                             sh 'snyk test'
