@@ -20,7 +20,7 @@ pipeline {
         stage('Build and Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CREDENTIALS) {
+                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
                         def app = docker.build("denisber1984/mypolybot-app:latest", 'polybot')
                         app.push("latest")
                     }
