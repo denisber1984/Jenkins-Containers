@@ -1,37 +1,19 @@
 pipeline {
-    agent {
-        docker {
-            image 'denisber1984/jenkins-agent:latest'
-            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
-
-    environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
-        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
-        GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git' // Your GitHub repo URL
-        DOCKER_IMAGE = 'denisber1984/mypolybot-app'
-    }
-
-    options {
-        buildDiscarder(logRotator(daysToKeepStr: '30'))
-        disableConcurrentBuilds()
-        timestamps()
-    }
+    agent any
 
     stages {
-        stage('Checkout') {
+        stage('Checkout SCM') {
             steps {
-                // Checkout code from GitHub
-                git url: "${GITHUB_REPO}", branch: 'main', credentialsId: 'github-credentials'
+                checkout scm
             }
         }
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
-                    docker.build(imageTag, '-f polybot/Dockerfile ./polybot')
+                    docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}", "polybot/Dockerfile").inside {
+                        sh 'echo Docker image built successfully'
+                    }
                 }
             }
         }
@@ -39,10 +21,9 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
-                        docker.image(imageTag).push()
-                        docker.image(imageTag).push('latest')
+                    docker.withRegistry('', 'dockerhub') {
+                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}").push()
+                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}").push('latest')
                     }
                 }
             }
@@ -51,49 +32,32 @@ pipeline {
         stage('Deploy') {
             steps {
                 echo 'Deploy stage - customize as needed'
-                // Add deployment steps here if necessary
-            }
-        }
-
-        stage('Check Docker Daemon') {
-            steps {
-                script {
-                    echo "Checking Docker daemon status..."
-                    sh 'docker version'
-                }
             }
         }
     }
 
+    options {
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
+        disableConcurrentBuilds()
+        timestamps()
+    }
+
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
+        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
+    }
+
     post {
         always {
-            cleanWs()
             script {
-                try {
-                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
-                    echo "Cleaning up Docker images: ${imageTag} and ${DOCKER_IMAGE}:latest"
-                    echo "Removing Docker images..."
-
-                    // Diagnostics before cleanup
-                    echo "Before cleanup:"
-                    sh 'docker ps -a'
-                    sh 'docker images'
-                    sh 'id'
-                    sh 'whoami'
-
-                    sh "docker rmi ${imageTag} || true"
-                    sh "docker rmi ${DOCKER_IMAGE}:latest || true"
-
-                    // Diagnostics after cleanup
-                    echo "After cleanup:"
-                    sh 'docker ps -a'
-                    sh 'docker images'
-                } catch (Exception e) {
-                    echo "Error during cleanup: ${e.getMessage()}"
-                    echo "Debug info: ${e}"
-                    throw e
-                }
+                // Clean up the built Docker images from the disk
+                sh """
+                    docker rmi denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT} || true
+                    docker rmi denisber1984/mypolybot-app:latest || true
+                """
             }
+            // Clean the workspace
+            cleanWs()
         }
     }
 }
