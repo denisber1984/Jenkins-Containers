@@ -54,6 +54,15 @@ pipeline {
                 // Add deployment steps here if necessary
             }
         }
+
+        stage('Check Docker Daemon') {
+            steps {
+                script {
+                    echo "Checking Docker daemon status..."
+                    sh 'docker version'
+                }
+            }
+        }
     }
 
     post {
@@ -63,10 +72,7 @@ pipeline {
                 try {
                     def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
                     echo "Cleaning up Docker images: ${imageTag} and ${DOCKER_IMAGE}:latest"
-                    echo "Checking Docker daemon status..."
-                    sh 'docker version || true'
                     echo "Removing Docker images..."
-                    sh 'docker images || true'
                     sh "docker rmi ${imageTag} || true"
                     sh "docker rmi ${DOCKER_IMAGE}:latest || true"
                 } catch (Exception e) {
