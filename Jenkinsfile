@@ -11,7 +11,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}", "polybot/Dockerfile").inside {
+                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}", "-f polybot/Dockerfile polybot").inside {
                         sh 'echo Docker image built successfully'
                     }
                 }
@@ -21,9 +22,10 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
+                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     docker.withRegistry('', 'dockerhub') {
-                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}").push()
-                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT}").push('latest')
+                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").push()
+                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").push('latest')
                     }
                 }
             }
@@ -50,9 +52,10 @@ pipeline {
     post {
         always {
             script {
+                def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 // Clean up the built Docker images from the disk
                 sh """
-                    docker rmi denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${env.GIT_COMMIT_SHORT} || true
+                    docker rmi denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} || true
                     docker rmi denisber1984/mypolybot-app:latest || true
                 """
             }
