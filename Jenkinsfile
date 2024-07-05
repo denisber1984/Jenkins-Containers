@@ -10,7 +10,13 @@ pipeline {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
         GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
         GITHUB_REPO = 'https://github.com/denisber1984/Jenkins-Containers.git' // Your GitHub repo URL
-        DOCKER_IMAGE = 'denisber1984/mypolybot-app:latest'
+        DOCKER_IMAGE = 'denisber1984/mypolybot-app'
+    }
+
+    options {
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
+        disableConcurrentBuilds()
+        timestamps()
     }
 
     stages {
@@ -24,7 +30,8 @@ pipeline {
         stage('Build Docker Image') {
             steps {
                 script {
-                    docker.build("${DOCKER_IMAGE}", '-f polybot/Dockerfile ./polybot')
+                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
+                    docker.build(imageTag, '-f polybot/Dockerfile ./polybot')
                 }
             }
         }
@@ -32,8 +39,10 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
+                    def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
-                        docker.image("${DOCKER_IMAGE}").push()
+                        docker.image(imageTag).push()
+                        docker.image(imageTag).push('latest')
                     }
                 }
             }
@@ -50,6 +59,12 @@ pipeline {
     post {
         always {
             cleanWs()
+            script {
+                // Cleanup Docker images
+                def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
+                sh "docker rmi ${imageTag} || true"
+                sh "docker rmi ${DOCKER_IMAGE}:latest || true"
+            }
         }
     }
 }
