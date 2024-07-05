@@ -73,8 +73,21 @@ pipeline {
                     def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
                     echo "Cleaning up Docker images: ${imageTag} and ${DOCKER_IMAGE}:latest"
                     echo "Removing Docker images..."
+
+                    // Diagnostics before cleanup
+                    echo "Before cleanup:"
+                    sh 'docker ps -a'
+                    sh 'docker images'
+                    sh 'id'
+                    sh 'whoami'
+
                     sh "docker rmi ${imageTag} || true"
                     sh "docker rmi ${DOCKER_IMAGE}:latest || true"
+
+                    // Diagnostics after cleanup
+                    echo "After cleanup:"
+                    sh 'docker ps -a'
+                    sh 'docker images'
                 } catch (Exception e) {
                     echo "Error during cleanup: ${e.getMessage()}"
                     echo "Debug info: ${e}"
