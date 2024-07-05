@@ -1,33 +1,32 @@
 pipeline {
-    agent {
-        docker {
-            image 'denisber1984/jenkins-agent:latest'
-            args '-v /var/run/docker.sock:/var/run/docker.sock'
-        }
-    }
+    agent any
+
     environment {
         DOCKERHUB_CREDENTIALS = credentials('dockerhub')
         GITHUB_CREDENTIALS = credentials('github-credentials')
     }
+
     stages {
         stage('Checkout SCM') {
             steps {
                 script {
-                    git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/denisber1984/Jenkins-Containers.git'
+                    checkout scm
                 }
             }
         }
+
         stage('Build and Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry('https://index.docker.io/v1/', 'dockerhub') {
-                        def app = docker.build("denisber1984/mypolybot-app:latest", 'polybot')
-                        app.push("latest")
+                    docker.withRegistry('https://index.docker.io/v1/', DOCKERHUB_CREDENTIALS) {
+                        def app = docker.build("denisber1984/mypolybot-app:latest", "polybot")
+                        app.push()
                     }
                 }
             }
         }
     }
+
     post {
         always {
             cleanWs()
