@@ -12,7 +12,9 @@ pipeline {
     stages {
         stage('Checkout SCM') {
             steps {
-                checkout scm
+                script {
+                    git branch: 'main', credentialsId: 'github-credentials', url: 'https://github.com/denisber1984/Jenkins-Containers.git'
+                }
             }
         }
         stage('Build and Push Docker Image') {
