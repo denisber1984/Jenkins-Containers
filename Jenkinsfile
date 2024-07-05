@@ -64,7 +64,7 @@ pipeline {
                     def imageTag = "${DOCKER_IMAGE}:${env.BUILD_NUMBER}"
                     echo "Cleaning up Docker images: ${imageTag} and ${DOCKER_IMAGE}:latest"
                     echo "Checking Docker daemon status..."
-                    sh "docker version || true"
+                    sh "docker info || true"
                     echo "Removing Docker images..."
                     sh "docker rmi ${imageTag} || true"
                     sh "docker rmi ${DOCKER_IMAGE}:latest || true"
