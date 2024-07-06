@@ -77,6 +77,16 @@ pipeline {
     }
 
     post {
+        success {
+            script {
+                // Check if the results.xml file exists before trying to access it
+                if (fileExists("${WORKSPACE}/results.xml")) {
+                    junit allowEmptyResults: true, testResults: '**/results.xml'
+                } else {
+                    echo "No results.xml file found, skipping JUnit reporting."
+                }
+            }
+        }
         always {
             script {
                 def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
@@ -88,16 +98,6 @@ pipeline {
             }
             // Clean the workspace
             cleanWs()
-        }
-        success {
-            script {
-                // Check if the results.xml file exists before trying to access it
-                if (fileExists("${WORKSPACE}/results.xml")) {
-                    junit allowEmptyResults: true, testResults: '**/results.xml'
-                } else {
-                    echo "No results.xml file found, skipping JUnit reporting."
-                }
-            }
         }
     }
 }
