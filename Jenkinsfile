@@ -92,7 +92,19 @@ pipeline {
 
         stage('Deploy') {
             steps {
-                echo 'Deploy stage - customize as needed'
+                script {
+                    sshagent(['ec2-ssh-credentials']) {
+                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        sh """
+                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-156-71-145.eu-central-1.compute.amazonaws.com '
+                                docker pull denisber1984/mypolybot-app:latest
+                                docker stop mypolybot-app || true
+                                docker rm mypolybot-app || true
+                                docker run -d --name mypolybot-app -p 80:80 denisber1984/mypolybot-app:latest
+                            '
+                        """
+                    }
+                }
             }
         }
     }
