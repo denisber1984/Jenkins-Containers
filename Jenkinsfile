@@ -24,7 +24,7 @@ pipeline {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
-                        sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
+                        sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
                     }
                 }
             }
