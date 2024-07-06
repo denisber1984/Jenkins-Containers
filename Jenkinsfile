@@ -24,12 +24,15 @@ pipeline {
                 script {
                     withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                        sh """
-                            snyk auth ${SNYK_TOKEN}
-                            snyk container test denisber1984/mypolybot-app:62-62b1591 --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
-                            snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
-                            snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
-                        """
+                        // Set SNYK_CACHE_PATH environment variable for local caching
+                        withEnv(["SNYK_CACHE_PATH=${env.WORKSPACE}/.snyk_cache"]) {
+                            sh """
+                                snyk auth ${SNYK_TOKEN}
+                                snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
+                                snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
+                                snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
+                            """
+                        }
                     }
                 }
             }
