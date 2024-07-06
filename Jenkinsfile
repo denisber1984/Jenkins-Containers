@@ -25,8 +25,9 @@ pipeline {
                     withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
+                            export SNYK_CACHE_PATH=${env.WORKSPACE}/.snyk_cache
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test denisber1984/mypolybot-app:62-62b1591 --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
+                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
                             snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
                             snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
                         """
@@ -63,6 +64,7 @@ pipeline {
     environment {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
         GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
+        SNYK_CACHE_PATH = "${env.WORKSPACE}/.snyk_cache" // Snyk cache path
     }
 
     post {
