@@ -22,16 +22,8 @@ pipeline {
         stage('Unittest') {
             steps {
                 script {
-                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
-                        // Run unittests
-                        sh 'python3 -m pytest --junitxml results.xml tests/*.py'
-                    }
-                }
-            }
-            post {
-                always {
-                    junit allowEmptyResults: true, testResults: 'results.xml'
+                    sh 'pip3 install pytest unittest2'
+                    sh 'python3 -m pytest --junitxml results.xml tests/*.py'
                 }
             }
         }
@@ -43,7 +35,7 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --ignore-policy snyk-ignore.json
+                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path snyk-ignore.json
                         """
                     }
                 }
@@ -92,6 +84,9 @@ pipeline {
             }
             // Clean the workspace
             cleanWs()
+        }
+        success {
+            junit allowEmptyResults: true, testResults: 'results.xml'
         }
     }
 }
