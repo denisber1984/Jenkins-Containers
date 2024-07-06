@@ -8,30 +8,34 @@ pipeline {
             }
         }
 
-        stage('Build Docker Image') {
-            steps {
-                script {
-                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}", "-f polybot/Dockerfile polybot").inside {
-                        sh 'echo Docker image built successfully'
+        stage('Build and Scan') {
+            parallel {
+                stage('Build Docker Image') {
+                    steps {
+                        script {
+                            def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}", "-f polybot/Dockerfile polybot").inside {
+                                sh 'echo Docker image built successfully'
+                            }
+                        }
                     }
                 }
-            }
-        }
 
-        stage('Snyk Security Scan') {
-            steps {
-                script {
-                    withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
-                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                        // Set SNYK_CACHE_PATH environment variable for local caching
-                        withEnv(["SNYK_CACHE_PATH=${env.WORKSPACE}/.snyk_cache"]) {
-                            sh """
-                                snyk auth ${SNYK_TOKEN}
-                                snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
-                                snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
-                                snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
-                            """
+                stage('Snyk Security Scan') {
+                    steps {
+                        script {
+                            withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
+                                def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                                // Set SNYK_CACHE_PATH environment variable for local caching
+                                withEnv(["SNYK_CACHE_PATH=${env.WORKSPACE}/.snyk_cache"]) {
+                                    sh """
+                                        snyk auth ${SNYK_TOKEN}
+                                        snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
+                                        snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
+                                        snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
+                                    """
+                                }
+                            }
                         }
                     }
                 }
