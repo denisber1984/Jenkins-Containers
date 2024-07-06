@@ -25,6 +25,8 @@ pipeline {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                     docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
                         sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
+                        sh 'ls -la ${WORKSPACE}'
+                        sh 'cat ${WORKSPACE}/results.xml'
                     }
                 }
             }
@@ -89,8 +91,12 @@ pipeline {
         }
         success {
             script {
-                sh 'ls -la ${WORKSPACE}/results.xml'
-                junit allowEmptyResults: true, testResults: '**/results.xml'
+                // Check if the results.xml file exists before trying to access it
+                if (fileExists("${WORKSPACE}/results.xml")) {
+                    junit allowEmptyResults: true, testResults: '**/results.xml'
+                } else {
+                    echo "No results.xml file found, skipping JUnit reporting."
+                }
             }
         }
     }
