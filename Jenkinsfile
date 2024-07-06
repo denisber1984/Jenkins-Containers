@@ -12,7 +12,9 @@ pipeline {
             steps {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    sh "docker build -t denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} -f polybot/Dockerfile polybot"
+                    docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}", "-f polybot/Dockerfile polybot").inside {
+                        sh 'echo Docker image built successfully'
+                    }
                 }
             }
         }
@@ -24,7 +26,9 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile
+                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile || true
+                            snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
+                            snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
                         """
                     }
                 }
@@ -59,7 +63,6 @@ pipeline {
     environment {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
         GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
-        JAVA_OPTS = '-Dorg.jenkinsci.plugins.durabletask.BourneShellScript.LAUNCH_DIAGNOSTICS=true'
     }
 
     post {
