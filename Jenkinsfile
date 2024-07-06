@@ -19,6 +19,20 @@ pipeline {
             }
         }
 
+        stage('Snyk Security Scan') {
+            steps {
+                script {
+                    withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
+                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        sh """
+                            snyk auth ${SNYK_TOKEN}
+                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile
+                        """
+                    }
+                }
+            }
+        }
+
         stage('Push Docker Image') {
             steps {
                 script {
