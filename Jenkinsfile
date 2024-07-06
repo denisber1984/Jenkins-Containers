@@ -19,14 +19,46 @@ pipeline {
             }
         }
 
-        stage('Unittest') {
-            steps {
-                script {
-                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
-                        sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
-                        sh 'ls -la ${WORKSPACE}'
-                        sh 'cat ${WORKSPACE}/results.xml'
+        stage('Parallel Stages') {
+            parallel {
+                stage('Unittest') {
+                    steps {
+                        script {
+                            def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
+                                sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            script {
+                                junit allowEmptyResults: true, testResults: '**/results.xml'
+                            }
+                        }
+                    }
+                }
+
+                stage('Static code linting') {
+                    steps {
+                        script {
+                            def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
+                                sh 'python3 -m pylint -f parseable --reports=no polybot/*.py > pylint.log'
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            script {
+                                sh 'cat pylint.log'
+                                recordIssues(
+                                    enabledForFailure: true,
+                                    aggregatingResults: true,
+                                    tools: [pyLint(name: 'Pylint', pattern: '**/pylint.log')]
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -79,13 +111,6 @@ pipeline {
     post {
         always {
             script {
-                // Check if the results.xml file exists before trying to access it
-                if (fileExists("${WORKSPACE}/results.xml")) {
-                    junit allowEmptyResults: true, testResults: '**/results.xml'
-                } else {
-                    echo "No results.xml file found, skipping JUnit reporting."
-                }
-
                 def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 // Clean up the built Docker images from the disk
                 sh """
@@ -95,6 +120,16 @@ pipeline {
             }
             // Clean the workspace
             cleanWs()
+        }
+        success {
+            script {
+                // Check if the results.xml file exists before trying to access it
+                if (fileExists("${WORKSPACE}/results.xml")) {
+                    junit allowEmptyResults: true, testResults: '**/results.xml'
+                } else {
+                    echo "No results.xml file found, skipping JUnit reporting."
+                }
+            }
         }
     }
 }
