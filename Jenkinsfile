@@ -22,8 +22,10 @@ pipeline {
         stage('Unittest') {
             steps {
                 script {
-                    sh 'pip3 install pytest unittest2'
-                    sh 'python3 -m pytest --junitxml results.xml tests/*.py'
+                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
+                        sh 'python3 -m pytest --junitxml results.xml tests/*.py'
+                    }
                 }
             }
         }
