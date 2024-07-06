@@ -88,7 +88,10 @@ pipeline {
             cleanWs()
         }
         success {
-            junit allowEmptyResults: true, testResults: '**/results.xml'
+            script {
+                sh 'ls -la ${WORKSPACE}/results.xml'
+                junit allowEmptyResults: true, testResults: '**/results.xml'
+            }
         }
     }
 }
