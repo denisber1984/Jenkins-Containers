@@ -26,9 +26,7 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test denisber1984/mypolybot-app:62-62b1591 --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
-                            snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
-                            snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
+                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --ignore-policy=snyk-ignore.json
                         """
                     }
                 }
