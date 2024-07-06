@@ -77,7 +77,7 @@ pipeline {
     }
 
     post {
-        success {
+        always {
             script {
                 // Check if the results.xml file exists before trying to access it
                 if (fileExists("${WORKSPACE}/results.xml")) {
@@ -85,10 +85,7 @@ pipeline {
                 } else {
                     echo "No results.xml file found, skipping JUnit reporting."
                 }
-            }
-        }
-        always {
-            script {
+
                 def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 // Clean up the built Docker images from the disk
                 sh """
