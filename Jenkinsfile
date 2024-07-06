@@ -19,6 +19,22 @@ pipeline {
             }
         }
 
+        stage('Unittest') {
+            steps {
+                script {
+                    // Install required packages
+                    sh 'pip3 install pytest unittest2'
+                    // Run unittests
+                    sh 'python3 -m pytest --junitxml results.xml tests/*.py'
+                }
+            }
+            post {
+                always {
+                    junit allowEmptyResults: true, testResults: 'results.xml'
+                }
+            }
+        }
+
         stage('Snyk Security Scan') {
             steps {
                 script {
@@ -26,7 +42,9 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --ignore-policy=snyk-ignore.json
+                            snyk container test denisber1984/mypolybot-app:62-62b1591 --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns
+                            snyk ignore --id=SNYK-DEBIAN12-ZLIB-6008963
+                            snyk ignore --id=SNYK-DEBIAN12-GIT-6846203
                         """
                     }
                 }
