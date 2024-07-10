@@ -71,6 +71,9 @@ pipeline {
         }
 
         stage('Snyk Security Scan') {
+            options {
+                timeout(time: 10, unit: 'MINUTES')
+            }
             steps {
                 script {
                     withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
@@ -84,7 +87,6 @@ pipeline {
                     }
                 }
             }
-            timeout(time: 10, unit: 'MINUTES')
         }
 
         stage('Push Docker Image to Nexus') {
