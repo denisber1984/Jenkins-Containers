@@ -86,4 +86,14 @@ pipeline {
                             docker run -d --name polybot_app -p 80:80 $DOCKER_IMAGE_NAME
                             EOF
                         """
-
+                    }
+                }
+            }
+        }
+    }
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
