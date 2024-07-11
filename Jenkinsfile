@@ -1,149 +1,105 @@
 pipeline {
     agent any
-
     environment {
-        DOCKER_REGISTRY = 'http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8081'
-        DOCKER_REPO = 'repository/nexus-repo'
-        DOCKERHUB_CREDENTIALS_ID = 'dockerhub'
-        NEXUS_CREDENTIALS_ID = 'nexus-credentials' // Use the Nexus credentials ID you created
+        NEXUS_CREDENTIALS_ID = 'nexus-credentials' // Ensure this ID matches the ID used when adding the Nexus credentials to Jenkins
+        NEXUS_URL = 'http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8081'
+        NEXUS_REPOSITORY = 'nexus-repo'
     }
-
     stages {
         stage('Checkout SCM') {
             steps {
                 checkout scm
             }
         }
-
         stage('Build Docker Image') {
             steps {
                 script {
-                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.build("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}", "-f polybot/Dockerfile polybot").inside {
-                        sh 'echo Docker image built successfully'
+                    def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    def dockerImageName = "${NEXUS_URL}/repository/${NEXUS_REPOSITORY}:${commitId}"
+
+                    withEnv(["DOCKER_IMAGE_NAME=${dockerImageName}"]) {
+                        sh 'docker build -t $DOCKER_IMAGE_NAME -f polybot/Dockerfile polybot'
                     }
                 }
             }
         }
-
-        stage('Parallel Stages') {
+        stage('Test Docker Image') {
             parallel {
                 stage('Unittest') {
                     steps {
                         script {
-                            def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                            docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
-                                sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
+                            withEnv(["DOCKER_IMAGE_NAME=${dockerImageName}"]) {
+                                sh 'docker inspect -f . $DOCKER_IMAGE_NAME'
+                                docker.image(dockerImageName).inside {
+                                    sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
+                                }
                             }
                         }
                     }
                     post {
                         always {
-                            script {
-                                junit allowEmptyResults: true, testResults: '**/results.xml'
-                            }
+                            junit 'results.xml'
                         }
                     }
                 }
-
                 stage('Static code linting') {
                     steps {
                         script {
-                            def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                            docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
-                                sh 'python3 -m pylint -f parseable --reports=no polybot/*.py > pylint.log'
+                            withEnv(["DOCKER_IMAGE_NAME=${dockerImageName}"]) {
+                                sh 'docker inspect -f . $DOCKER_IMAGE_NAME'
+                                docker.image(dockerImageName).inside {
+                                    sh 'python3 -m pylint -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py | tee pylint.log'
+                                }
                             }
                         }
                     }
                     post {
                         always {
-                            script {
-                                sh 'cat pylint.log'
-                                recordIssues(
-                                    enabledForFailure: true,
-                                    aggregatingResults: true,
-                                    tools: [pyLint(name: 'Pylint', pattern: '**/pylint.log')]
-                                )
-                            }
+                            recordIssues tools: [pylint(pattern: 'pylint.log')]
                         }
                     }
                 }
             }
         }
-
         stage('Snyk Security Scan') {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
-                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                        sh """
-                            snyk auth ${SNYK_TOKEN}
-                            snyk container test ${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
-                        """
+                        sh '''
+                            snyk auth $SNYK_TOKEN
+                            snyk container test $DOCKER_IMAGE_NAME --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
+                        '''
                     }
                 }
             }
         }
-
         stage('Push Docker Image to Nexus') {
             steps {
                 script {
-                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.withRegistry("${DOCKER_REGISTRY}/${DOCKER_REPO}", "${NEXUS_CREDENTIALS_ID}") {
-                        docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push()
-                        docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push('latest')
+                    docker.withRegistry("${NEXUS_URL}/repository/${NEXUS_REPOSITORY}", NEXUS_CREDENTIALS_ID) {
+                        sh 'docker push $DOCKER_IMAGE_NAME'
                     }
                 }
             }
         }
-
         stage('Deploy') {
             steps {
                 script {
                     sshagent(['ec2-ssh-credentials']) {
-                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@<correct-ec2-hostname> '
-                                docker pull ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest
-                                docker stop mypolybot-app || true
-                                docker rm mypolybot-app || true
-                                docker run -d --name mypolybot-app -p 80:80 ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest
-                            '
+                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-199-84-131.eu-central-1.compute.amazonaws.com << EOF
+                            docker pull $DOCKER_IMAGE_NAME
+                            docker run -d --name polybot_app -p 80:80 $DOCKER_IMAGE_NAME
+                            EOF
                         """
                     }
                 }
             }
         }
     }
-
-    options {
-        buildDiscarder(logRotator(daysToKeepStr: '30'))
-        disableConcurrentBuilds()
-        timestamps()
-    }
-
     post {
         always {
-            script {
-                def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                // Clean up the built Docker images from the disk
-                sh """
-                    docker rmi ${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort} || true
-                    docker rmi ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest || true
-                """
-            }
-            // Clean the workspace
             cleanWs()
-        }
-        success {
-            script {
-                // Check if the results.xml file exists before trying to access it
-                if (fileExists("${WORKSPACE}/results.xml")) {
-                    junit allowEmptyResults: true, testResults: '**/results.xml'
-                } else {
-                    echo "No results.xml file found, skipping JUnit reporting."
-                }
-            }
         }
     }
 }
