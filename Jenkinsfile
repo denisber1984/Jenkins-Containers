@@ -15,11 +15,9 @@ pipeline {
             steps {
                 script {
                     def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    def dockerImageName = "${NEXUS_URL}/${NEXUS_REPOSITORY}:${commitId}"
+                    env.DOCKER_IMAGE_NAME = "${NEXUS_URL}/${NEXUS_REPOSITORY}:${commitId}"
 
-                    withEnv(["DOCKER_IMAGE_NAME=${dockerImageName}"]) {
-                        sh 'docker build -t $DOCKER_IMAGE_NAME -f polybot/Dockerfile polybot'
-                    }
+                    sh 'docker build -t $DOCKER_IMAGE_NAME -f polybot/Dockerfile polybot'
                 }
             }
         }
@@ -28,11 +26,9 @@ pipeline {
                 stage('Unittest') {
                     steps {
                         script {
-                            withEnv(["DOCKER_IMAGE_NAME=${dockerImageName}"]) {
-                                sh 'docker inspect -f . $DOCKER_IMAGE_NAME'
-                                docker.image(dockerImageName).inside {
-                                    sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
-                                }
+                            sh 'docker inspect -f . $DOCKER_IMAGE_NAME'
+                            docker.image(env.DOCKER_IMAGE_NAME).inside {
+                                sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
                             }
                         }
                     }
@@ -45,11 +41,9 @@ pipeline {
                 stage('Static code linting') {
                     steps {
                         script {
-                            withEnv(["DOCKER_IMAGE_NAME=${dockerImageName}"]) {
-                                sh 'docker inspect -f . $DOCKER_IMAGE_NAME'
-                                docker.image(dockerImageName).inside {
-                                    sh 'python3 -m pylint -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py | tee pylint.log'
-                                }
+                            sh 'docker inspect -f . $DOCKER_IMAGE_NAME'
+                            docker.image(env.DOCKER_IMAGE_NAME).inside {
+                                sh 'python3 -m pylint -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py | tee pylint.log'
                             }
                         }
                     }
@@ -92,14 +86,4 @@ pipeline {
                             docker run -d --name polybot_app -p 80:80 $DOCKER_IMAGE_NAME
                             EOF
                         """
-                    }
-                }
-            }
-        }
-    }
-    post {
-        always {
-            cleanWs()
-        }
-    }
-}
+
