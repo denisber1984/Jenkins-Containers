@@ -96,7 +96,7 @@ pipeline {
                     sshagent(['ec2-ssh-credentials']) {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-185-113-241.eu-central-1.compute.amazonaws.com '
+                            ssh -o StrictHostKeyChecking=no ec2-user@ec18.199.84.131.eu-central-1.compute.amazonaws.com '
                                 docker pull denisber1984/mypolybot-app:latest
                                 docker stop mypolybot-app || true
                                 docker rm mypolybot-app || true
