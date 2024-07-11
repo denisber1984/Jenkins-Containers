@@ -4,7 +4,8 @@ pipeline {
     environment {
         DOCKER_REGISTRY = 'ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082'
         DOCKER_REPO = 'nexus-repo'
-        DOCKER_CREDENTIALS_ID = 'dockerhub'
+        DOCKERHUB_CREDENTIALS_ID = 'dockerhub'
+        NEXUS_CREDENTIALS_ID = 'nexus-credentials' // Update this with your Nexus credentials ID
     }
 
     stages {
@@ -88,7 +89,7 @@ pipeline {
             steps {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.withRegistry("http://${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS_ID}") {
+                    docker.withRegistry("http://${DOCKER_REGISTRY}", "${NEXUS_CREDENTIALS_ID}") {
                         docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push()
                         docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push('latest')
                     }
