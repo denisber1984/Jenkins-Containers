@@ -2,10 +2,10 @@ pipeline {
     agent any
 
     environment {
-        DOCKER_REGISTRY = 'ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082'
-        DOCKER_REPO = 'nexus-repo'
+        DOCKER_REGISTRY = 'http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8081'
+        DOCKER_REPO = 'repository/nexus-repo'
         DOCKERHUB_CREDENTIALS_ID = 'dockerhub'
-        NEXUS_CREDENTIALS_ID = 'nexus-credentials' // Update this with your Nexus credentials ID
+        NEXUS_CREDENTIALS_ID = 'nexus-credentials' // Use the Nexus credentials ID you created
     }
 
     stages {
@@ -89,7 +89,7 @@ pipeline {
             steps {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.withRegistry("http://${DOCKER_REGISTRY}", "${NEXUS_CREDENTIALS_ID}") {
+                    docker.withRegistry("${DOCKER_REGISTRY}/${DOCKER_REPO}", "${NEXUS_CREDENTIALS_ID}") {
                         docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push()
                         docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push('latest')
                     }
@@ -103,7 +103,7 @@ pipeline {
                     sshagent(['ec2-ssh-credentials']) {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-199-84-131.eu-central-1.compute.amazonaws.com '
+                            ssh -o StrictHostKeyChecking=no ec2-user@<correct-ec2-hostname> '
                                 docker pull ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest
                                 docker stop mypolybot-app || true
                                 docker rm mypolybot-app || true
