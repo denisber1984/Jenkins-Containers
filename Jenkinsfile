@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_REGISTRY = 'ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082'
+        DOCKER_REPO = 'nexus-repo'
+        DOCKER_CREDENTIALS_ID = 'dockerhub'
+    }
+
     stages {
         stage('Checkout SCM') {
             steps {
@@ -12,7 +18,7 @@ pipeline {
             steps {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.build("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}", "-f polybot/Dockerfile polybot").inside {
+                    docker.build("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}", "-f polybot/Dockerfile polybot").inside {
                         sh 'echo Docker image built successfully'
                     }
                 }
@@ -25,7 +31,7 @@ pipeline {
                     steps {
                         script {
                             def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                            docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
+                            docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
                                 sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
                             }
                         }
@@ -43,7 +49,7 @@ pipeline {
                     steps {
                         script {
                             def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                            docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
+                            docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").inside {
                                 sh 'python3 -m pylint -f parseable --reports=no polybot/*.py > pylint.log'
                             }
                         }
@@ -71,20 +77,20 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
+                            snyk container test ${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
                         """
                     }
                 }
             }
         }
 
-        stage('Push Docker Image') {
+        stage('Push Docker Image to Nexus') {
             steps {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.withRegistry('', 'dockerhub') {
-                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").push()
-                        docker.image("denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort}").push('latest')
+                    docker.withRegistry("http://${DOCKER_REGISTRY}", "${DOCKER_CREDENTIALS_ID}") {
+                        docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push()
+                        docker.image("${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort}").push('latest')
                     }
                 }
             }
@@ -97,10 +103,10 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-199-84-131.eu-central-1.compute.amazonaws.com '
-                                docker pull denisber1984/mypolybot-app:latest
+                                docker pull ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest
                                 docker stop mypolybot-app || true
                                 docker rm mypolybot-app || true
-                                docker run -d --name mypolybot-app -p 80:80 denisber1984/mypolybot-app:latest
+                                docker run -d --name mypolybot-app -p 80:80 ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest
                             '
                         """
                     }
@@ -115,19 +121,14 @@ pipeline {
         timestamps()
     }
 
-    environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
-        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
-    }
-
     post {
         always {
             script {
                 def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 // Clean up the built Docker images from the disk
                 sh """
-                    docker rmi denisber1984/mypolybot-app:${env.BUILD_NUMBER}-${gitCommitShort} || true
-                    docker rmi denisber1984/mypolybot-app:latest || true
+                    docker rmi ${DOCKER_REGISTRY}/${DOCKER_REPO}:${env.BUILD_NUMBER}-${gitCommitShort} || true
+                    docker rmi ${DOCKER_REGISTRY}/${DOCKER_REPO}:latest || true
                 """
             }
             // Clean the workspace
