@@ -2,8 +2,8 @@ pipeline {
     agent any
     environment {
         NEXUS_CREDENTIALS_ID = 'nexus-credentials' // Ensure this ID matches the ID used when adding the Nexus credentials to Jenkins
-        NEXUS_URL = 'http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8081'
-        NEXUS_REPOSITORY = 'nexus-repo'
+        NEXUS_URL = 'ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8081'
+        NEXUS_REPOSITORY = 'repository/nexus-repo'
     }
     stages {
         stage('Checkout SCM') {
@@ -15,7 +15,7 @@ pipeline {
             steps {
                 script {
                     def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    def dockerImageName = "${NEXUS_URL}/repository/${NEXUS_REPOSITORY}:${commitId}"
+                    def dockerImageName = "${NEXUS_URL}/${NEXUS_REPOSITORY}:${commitId}"
 
                     withEnv(["DOCKER_IMAGE_NAME=${dockerImageName}"]) {
                         sh 'docker build -t $DOCKER_IMAGE_NAME -f polybot/Dockerfile polybot'
@@ -76,7 +76,7 @@ pipeline {
         stage('Push Docker Image to Nexus') {
             steps {
                 script {
-                    docker.withRegistry("${NEXUS_URL}/repository/${NEXUS_REPOSITORY}", NEXUS_CREDENTIALS_ID) {
+                    docker.withRegistry("http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}", NEXUS_CREDENTIALS_ID) {
                         sh 'docker push $DOCKER_IMAGE_NAME'
                     }
                 }
