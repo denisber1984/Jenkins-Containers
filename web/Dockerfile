@@ -1,5 +1,5 @@
 # Use the official Nginx image as the base image
-FROM nginx:alpine
+FROM nginx:latest
 
 # Copy the Nginx configuration file into the container
 COPY nginx.conf /etc/nginx/nginx.conf
@@ -8,7 +8,7 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY . /usr/share/nginx/html
 
 # Expose the port that Nginx will run on
-EXPOSE 80
+EXPOSE 8444
 
 # Start Nginx
 CMD ["nginx", "-g", "daemon off;"]

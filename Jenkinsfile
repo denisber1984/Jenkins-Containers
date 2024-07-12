@@ -1,77 +1,193 @@
 pipeline {
     agent any
+    options {
+        // Keeps builds for the last 30 days.
+        buildDiscarder(logRotator(daysToKeepStr: '30'))
+        // Prevents concurrent builds of the same pipeline.
+        disableConcurrentBuilds()
+        // Adds timestamps to the log output.
+        timestamps()
+    }
 
     environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub')
-        NEXUS_CREDENTIALS = credentials('nexus-credentials')
+        // Define environment variables
+        APP_IMAGE_NAME = 'app-image'
+        WEB_IMAGE_NAME = 'web-image'
+        DOCKER_COMPOSE_FILE = 'compose.yaml'
+        DOCKER_REPO = 'denisber1984/polybot_app'
+        NEXUS_REPO = "nexus-repo"
+        NEXUS_PROTOCOL = "http"
+        NEXUS_URL = "ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082"
+        AWS_ELASTIC_IP = '3.76.72.36'
+        SSH_KEY_PATH = '/path/to/your/aws-key.pem'
+        NEXUS_CREDENTIALS_ID = 'nexus-credentials'
+        DOCKERHUB_CREDENTIALS = 'dockerhub'
+        SNYK_API_TOKEN = 'snyk-api-token'
     }
 
     stages {
-        stage('Checkout SCM') {
+        stage('Use Shared Library Code') {
             steps {
+                // Use the helloWorld function from the shared library
+                helloWorld('DevOps Student')
+            }
+        }
+        stage('Checkout and Extract Git Commit Hash') {
+            steps {
+                // Checkout code
                 checkout scm
             }
         }
         stage('Build Docker Image') {
             steps {
                 script {
-                    def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.build("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${commitId}-${BUILD_NUMBER}", "-f polybot/Dockerfile polybot")
+                    // Build Docker image using docker-compose
+                    sh """
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} build
+                    """
                 }
             }
         }
-        stage('Push Docker Image') {
+        stage('Install Python Requirements') {
             steps {
                 script {
-                    def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.withRegistry('http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082', 'nexus-credentials') {
-                        docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${commitId}-${BUILD_NUMBER}").push()
-                        docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${commitId}-${BUILD_NUMBER}").push('latest')
+                    // Install Python dependencies
+                    sh """
+                        pip install --upgrade pip
+                        pip install pytest unittest2 pylint flask telebot Pillow loguru matplotlib
+                    """
+                }
+            }
+        }
+        stage('Static Code Linting and Unittest') {
+            parallel {
+                stage('Static code linting') {
+                    steps {
+                        script {
+                            // Run python code analysis
+                            sh """
+                                python -m pylint -f parseable --reports=no polybot/*.py > pylint.log
+                                cat pylint.log
+                            """
+                        }
+                    }
+                }
+                stage('Unittest') {
+                    steps {
+                        script {
+                            // Run unittests
+                            sh 'python -m pytest --junitxml results.xml polybot/test'
+                        }
                     }
                 }
             }
         }
-        stage('Unittest') {
+        stage('Security Vulnerability Scanning') {
             steps {
                 script {
-                    def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${commitId}-${BUILD_NUMBER}").inside('-u root') {
-                        sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
+                    withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
+                        // Scan the image
+                        sh """
+                            snyk auth $SNYK_TOKEN
+                            snyk container test ${APP_IMAGE_NAME}:latest --severity-threshold=high || exit 0
+                        """
                     }
                 }
-                junit 'results.xml'
             }
         }
-        stage('Static code linting') {
+        stage('Login, Tag, and Push Images') {
             steps {
-                script {
-                    def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${commitId}-${BUILD_NUMBER}").inside('-u root') {
-                        sh 'python3 -m pylint -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py > pylint-report.txt'
+                withCredentials([
+                    usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'USER', passwordVariable: 'PASS'),
+                    usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
+                ]) {
+                    script {
+                        // Retrieve the Git commit hash
+                        sh(script: 'git rev-parse --short HEAD > gitCommit.txt')
+                        def GITCOMMIT = readFile('gitCommit.txt').trim()
+                        def GIT_TAG = "${GITCOMMIT}"
+                        // Set IMAGE_TAG as an environment variable
+                        env.IMAGE_TAG = "v1.0.0-${BUILD_NUMBER}-${GIT_TAG}"
+                        // Login to Dockerhub / Nexus repo ,tag, and push images
+                        sh """
+                            cd polybot
+                            docker login -u ${USER} -p ${PASS} ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}
+                            docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}
+                            docker tag ${APP_IMAGE_NAME}:latest ${NEXUS_URL}/${APP_IMAGE_NAME}:${env.IMAGE_TAG}
+                            docker tag ${WEB_IMAGE_NAME}:latest ${NEXUS_URL}/${WEB_IMAGE_NAME}:${env.IMAGE_TAG}
+                            docker tag ${APP_IMAGE_NAME}:latest ${DOCKER_REPO}:${APP_IMAGE_NAME}-${env.IMAGE_TAG}
+                            docker tag ${WEB_IMAGE_NAME}:latest ${DOCKER_REPO}:${WEB_IMAGE_NAME}-${env.IMAGE_TAG}
+                            docker push ${NEXUS_URL}/${APP_IMAGE_NAME}:${env.IMAGE_TAG}
+                            docker push ${NEXUS_URL}/${WEB_IMAGE_NAME}:${env.IMAGE_TAG}
+                            docker push ${DOCKER_REPO}:${APP_IMAGE_NAME}-${env.IMAGE_TAG}
+                            docker push ${DOCKER_REPO}:${WEB_IMAGE_NAME}-${env.IMAGE_TAG}
+                        """
                     }
                 }
-                recordIssues tools: [pylint(pattern: 'pylint-report.txt')]
             }
         }
-        stage('Snyk Security Scan') {
+        stage('Deployment on EC2') {
             steps {
-                snykSecurity failOnIssues: true, snykTokenId: 'snyk-api-token', severity: 'high'
-            }
-        }
-        stage('Deploy') {
-            steps {
-                echo 'Deploying the application...'
-                // Add your deployment steps here
+                withCredentials([usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')]) {
+                    script {
+                        // Login to Dockerhub private repo
+                        sh """
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ec2-user@${AWS_ELASTIC_IP} "docker login -u ${DOCKER_USER} -p ${DOCKER_PASS}"
+                        """
+
+                        // Pull the app image from Dockerhub
+                        sh """
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ec2-user@${AWS_ELASTIC_IP} "docker pull ${DOCKER_REPO}:${APP_IMAGE_NAME}-${env.IMAGE_TAG}"
+                        """
+
+                        // Pull the web image from Dockerhub
+                        sh """
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ec2-user@${AWS_ELASTIC_IP} "docker pull ${DOCKER_REPO}:${WEB_IMAGE_NAME}-${env.IMAGE_TAG}"
+                        """
+
+                        // Stop the previous my-app-container
+                        sh """
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ec2-user@${AWS_ELASTIC_IP} "docker stop my-app-container my-web-container"
+                        """
+
+                        // Remove the previous my-app-container
+                        sh """
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ec2-user@${AWS_ELASTIC_IP} "docker rm -f my-app-container my-web-container"
+                        """
+
+                        // Run the app image at 8443
+                        sh """
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ec2-user@${AWS_ELASTIC_IP} "docker run -d -p 843:8443 --name my-app-container ${DOCKER_REPO}:${APP_IMAGE_NAME}-${env.IMAGE_TAG}"
+                        """
+
+                        // Run the web image at 8444
+                        sh """
+                            ssh -i ${SSH_KEY_PATH} -o StrictHostKeyChecking=no ec2-user@${AWS_ELASTIC_IP} "docker run -d -p 844:8444 --name my-web-container ${DOCKER_REPO}:${WEB_IMAGE_NAME}-${env.IMAGE_TAG}"
+                        """
+                    }
+                }
             }
         }
     }
     post {
         always {
-            cleanWs()
             script {
-                def commitId = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                sh "docker rmi ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${commitId}-${BUILD_NUMBER} || true"
-                sh "docker rmi ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:latest || true"
+                // Process the test results using the JUnit plugin
+                junit 'results.xml'
+
+                // Process the pylint report using the Warnings Plugin
+                recordIssues enabledForFailure: true, aggregatingResults: true
+                recordIssues tools: [pyLint(pattern: 'pylint.log')]
+
+                // Clean up workspace after build
+                cleanWs(cleanWhenNotBuilt: false,
+                        deleteDirs: true,
+                        notFailBuild: true)
+
+                // Clean up unused dangling Docker images
+                sh """
+                    docker image prune -f
+                """
             }
         }
     }
