@@ -83,7 +83,7 @@ pipeline {
         stage('Push Docker Image to Nexus') {
             steps {
                 script {
-                    docker.withRegistry("http://${NEXUS_URL}/repository/${NEXUS_REPOSITORY}", NEXUS_CREDENTIALS_ID) {
+                    docker.withRegistry("http://${NEXUS_URL}", NEXUS_CREDENTIALS_ID) {
                         sh 'docker push ${DOCKER_IMAGE_NAME}'
                     }
                 }
