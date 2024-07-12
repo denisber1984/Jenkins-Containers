@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
+        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
+        NEXUS_CREDENTIALS = credentials('nexus-credentials') // Nexus credentials
+    }
+
     stages {
         stage('Checkout SCM') {
             steps {
@@ -81,10 +87,18 @@ pipeline {
         stage('Push Docker Image') {
             steps {
                 script {
-                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.withRegistry('', 'dockerhub') {
-                        docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}").push()
-                        docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}").push('latest')
+                    withCredentials([
+                        usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASSWORD'),
+                        usernamePassword(credentialsId: 'nexus-credentials-id', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')
+                    ]) {
+                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                        docker.withRegistry('http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082', 'nexus-credentials-id') {
+                            sh """
+                                docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}
+                                docker tag ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER} ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}
+                                docker push ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}
+                            """
+                        }
                     }
                 }
             }
@@ -96,7 +110,7 @@ pipeline {
                     sshagent(['ec2-ssh-credentials']) {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-156-71-145.eu-central-1.compute.amazonaws.com '
+                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-3-76-253-200.eu-central-1.compute.amazonaws.com '
                                 docker pull ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:latest
                                 docker stop mypolybot-app || true
                                 docker rm mypolybot-app || true
@@ -113,11 +127,6 @@ pipeline {
         buildDiscarder(logRotator(daysToKeepStr: '30'))
         disableConcurrentBuilds()
         timestamps()
-    }
-
-    environment {
-        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
-        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
     }
 
     post {
