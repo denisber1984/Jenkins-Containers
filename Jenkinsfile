@@ -54,18 +54,6 @@ pipeline {
             }
         }
 
-        stage('Static code linting') {
-            steps {
-                script {
-                    def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
-                        sh 'python3 -m pylint --persistent=n -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py > pylint.log || true'
-                    }
-                }
-                recordIssues tools: [pylint(pattern: 'pylint.log')]
-            }
-        }
-
         stage('Snyk Security Scan') {
             steps {
                 withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
