@@ -92,7 +92,7 @@ pipeline {
                         usernamePassword(credentialsId: 'nexus-credentials', usernameVariable: 'NEXUS_USER', passwordVariable: 'NEXUS_PASSWORD')
                     ]) {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                        docker.withRegistry('http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082', 'nexus-credentials-id') {
+                        docker.withRegistry('http://ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082', 'nexus-credentials') {
                             sh """
                                 docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}
                                 docker tag ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER} ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}
