@@ -1,10 +1,6 @@
 pipeline {
     agent any
-    environment {
-        NEXUS_CREDENTIALS_ID = 'nexus-credentials'
-        NEXUS_URL = 'ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082'
-        NEXUS_REPOSITORY = 'repository/nexus-repo'
-    }
+
     stages {
         stage('Checkout SCM') {
             steps {
@@ -16,8 +12,7 @@ pipeline {
             steps {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    env.DOCKER_IMAGE_NAME = "${NEXUS_URL}/${NEXUS_REPOSITORY}:${gitCommitShort}"
-                    docker.build("${env.DOCKER_IMAGE_NAME}", "-f polybot/Dockerfile polybot").inside {
+                    docker.build("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}", "-f polybot/Dockerfile polybot").inside {
                         sh 'echo Docker image built successfully'
                     }
                 }
@@ -29,7 +24,8 @@ pipeline {
                 stage('Unittest') {
                     steps {
                         script {
-                            docker.image(env.DOCKER_IMAGE_NAME).inside {
+                            def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}").inside {
                                 sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
                             }
                         }
@@ -46,7 +42,8 @@ pipeline {
                 stage('Static code linting') {
                     steps {
                         script {
-                            docker.image(env.DOCKER_IMAGE_NAME).inside {
+                            def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                            docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}").inside {
                                 sh 'python3 -m pylint -f parseable --reports=no polybot/*.py > pylint.log'
                             }
                         }
@@ -71,20 +68,23 @@ pipeline {
             steps {
                 script {
                     withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
+                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test ${env.DOCKER_IMAGE_NAME} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
+                            snyk container test ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
                         """
                     }
                 }
             }
         }
 
-        stage('Push Docker Image to Nexus') {
+        stage('Push Docker Image') {
             steps {
                 script {
-                    docker.withRegistry("http://${NEXUS_URL}", NEXUS_CREDENTIALS_ID) {
-                        sh 'docker push ${DOCKER_IMAGE_NAME}'
+                    def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
+                    docker.withRegistry('', 'dockerhub') {
+                        docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}").push()
+                        docker.image("ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER}").push('latest')
                     }
                 }
             }
@@ -94,12 +94,13 @@ pipeline {
             steps {
                 script {
                     sshagent(['ec2-ssh-credentials']) {
+                        def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-3-76-253-200.eu-central-1.compute.amazonaws.com '
-                                docker pull ${DOCKER_IMAGE_NAME}
+                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-156-71-145.eu-central-1.compute.amazonaws.com '
+                                docker pull ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:latest
                                 docker stop mypolybot-app || true
                                 docker rm mypolybot-app || true
-                                docker run -d --name mypolybot-app -p 80:80 ${DOCKER_IMAGE_NAME}
+                                docker run -d --name mypolybot-app -p 80:80 ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:latest
                             '
                         """
                     }
@@ -114,13 +115,19 @@ pipeline {
         timestamps()
     }
 
+    environment {
+        DOCKER_HUB_CREDENTIALS = credentials('dockerhub') // Docker Hub credentials
+        GITHUB_CREDENTIALS = credentials('github-credentials') // GitHub credentials
+    }
+
     post {
         always {
             script {
                 def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 // Clean up the built Docker images from the disk
                 sh """
-                    docker rmi ${env.DOCKER_IMAGE_NAME} || true
+                    docker rmi ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:${gitCommitShort}-${env.BUILD_NUMBER} || true
+                    docker rmi ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082/repository/nexus-repo:latest || true
                 """
             }
             // Clean the workspace
