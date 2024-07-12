@@ -37,11 +37,9 @@ pipeline {
                     // Ensure docker-compose is available
                     sh 'docker-compose --version'
                     // Build Docker image using docker-compose
-                    withDockerContainer(image: 'docker/compose:1.29.2', args: '-u root:root --entrypoint=""') {
-                        sh """
-                            docker-compose -f ${DOCKER_COMPOSE_FILE} build
-                        """
-                    }
+                    sh """
+                        docker-compose -f ${DOCKER_COMPOSE_FILE} build
+                    """
                 }
             }
         }
