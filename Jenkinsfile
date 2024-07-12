@@ -59,10 +59,10 @@ pipeline {
                 script {
                     def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
                     docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
-                        sh 'python3 -m pylint -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py > pylint.log || true'
+                        sh 'python3 -m pylint --persistent=n -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py > pylint.log || true'
                     }
                 }
-                recordIssues tools: [pylintParser(pattern: 'pylint.log')]
+                recordIssues tools: [pylint(pattern: 'pylint.log')]
             }
         }
 
