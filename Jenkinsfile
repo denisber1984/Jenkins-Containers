@@ -62,7 +62,7 @@ pipeline {
                         sh 'python3 -m pylint -f parseable --reports=no polybot/app.py polybot/bot.py polybot/img_proc.py > pylint.log || true'
                     }
                 }
-                recordIssues tools: [pylint(pattern: 'pylint.log')]
+                recordIssues tools: [pylintParser(pattern: 'pylint.log')]
             }
         }
 
