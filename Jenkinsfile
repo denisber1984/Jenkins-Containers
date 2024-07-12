@@ -21,7 +21,7 @@ pipeline {
             steps {
                 script {
                     def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                    docker.build("${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}", "-f polybot/Dockerfile polybot").inside {
+                    docker.build("${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}", "-f polybot/Dockerfile polybot").inside {
                         sh 'echo Docker image built successfully'
                     }
                 }
@@ -34,7 +34,7 @@ pipeline {
                     steps {
                         script {
                             def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                            docker.image("${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}").inside {
+                            docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}").inside {
                                 sh 'python3 -m pytest --junitxml=${WORKSPACE}/results.xml tests/test.py'
                             }
                         }
@@ -52,7 +52,7 @@ pipeline {
                     steps {
                         script {
                             def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
-                            docker.image("${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}").inside {
+                            docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}").inside {
                                 sh 'python3 -m pylint -f parseable --reports=no polybot/*.py > pylint.log'
                             }
                         }
@@ -80,7 +80,7 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             snyk auth ${SNYK_TOKEN}
-                            snyk container test ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
+                            snyk container test ${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json
                         """
                     }
                 }
@@ -98,8 +98,8 @@ pipeline {
                         docker.withRegistry("${NEXUS_PROTOCOL}://${NEXUS_URL}", 'nexus-credentials') {
                             sh """
                                 docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}
-                                docker tag ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER} ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}
-                                docker push ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}
+                                docker tag ${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER} ${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}
+                                docker push ${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER}
                             """
                         }
                     }
@@ -114,10 +114,10 @@ pipeline {
                         def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                         sh """
                             ssh -o StrictHostKeyChecking=no ec2-user@ec2-3-76-253-200.eu-central-1.compute.amazonaws.com '
-                                docker pull ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:latest
+                                docker pull ${NEXUS_URL}/repository/${NEXUS_REPO}:latest
                                 docker stop mypolybot-app || true
                                 docker rm mypolybot-app || true
-                                docker run -d --name mypolybot-app -p 80:80 ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:latest
+                                docker run -d --name mypolybot-app -p 80:80 ${NEXUS_URL}/repository/${NEXUS_REPO}:latest
                             '
                         """
                     }
@@ -138,8 +138,8 @@ pipeline {
                 def gitCommitShort = sh(script: 'git rev-parse --short HEAD', returnStdout: true).trim()
                 // Clean up the built Docker images from the disk
                 sh """
-                    docker rmi ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER} || true
-                    docker rmi ${NEXUS_PROTOCOL}://${NEXUS_URL}/repository/${NEXUS_REPO}:latest || true
+                    docker rmi ${NEXUS_URL}/repository/${NEXUS_REPO}:${gitCommitShort}-${env.BUILD_NUMBER} || true
+                    docker rmi ${NEXUS_URL}/repository/${NEXUS_REPO}:latest || true
                 """
             }
             // Clean the workspace
