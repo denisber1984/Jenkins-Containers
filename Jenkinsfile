@@ -2,7 +2,7 @@ pipeline {
     agent any
     environment {
         NEXUS_CREDENTIALS_ID = 'nexus-credentials'
-        NEXUS_URL = 'ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8081'
+        NEXUS_URL = 'ec2-3-76-72-36.eu-central-1.compute.amazonaws.com:8082'
         NEXUS_REPOSITORY = 'repository/nexus-repo'
     }
     stages {
