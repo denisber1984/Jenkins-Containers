@@ -81,7 +81,7 @@ pipeline {
                 script {
                     sshagent(['ec2-ssh-credentials']) {
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-18-199-84-131.eu-central-1.compute.amazonaws.com << EOF
+                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-3-76-253-200.eu-central-1.compute.amazonaws.com << EOF
                             docker pull $DOCKER_IMAGE_NAME
                             docker run -d --name polybot_app -p 80:80 $DOCKER_IMAGE_NAME
                             EOF
