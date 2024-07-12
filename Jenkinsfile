@@ -26,16 +26,15 @@ pipeline {
     }
 
     stages {
-        stage('Use Shared Library Code') {
-            steps {
-                // Use the helloWorld function from the shared library
-                helloWorld('DevOps Student')
-            }
-        }
         stage('Checkout and Extract Git Commit Hash') {
             steps {
                 // Checkout code
                 checkout scm
+                // Extract Git commit hash
+                script {
+                    sh(script: 'git rev-parse --short HEAD > gitCommit.txt')
+                    env.GIT_COMMIT = readFile('gitCommit.txt').trim()
+                }
             }
         }
         stage('Build Docker Image') {
@@ -102,10 +101,7 @@ pipeline {
                     usernamePassword(credentialsId: 'dockerhub', usernameVariable: 'DOCKER_USER', passwordVariable: 'DOCKER_PASS')
                 ]) {
                     script {
-                        // Retrieve the Git commit hash
-                        sh(script: 'git rev-parse --short HEAD > gitCommit.txt')
-                        def GITCOMMIT = readFile('gitCommit.txt').trim()
-                        def GIT_TAG = "${GITCOMMIT}"
+                        def GIT_TAG = "${env.GIT_COMMIT}"
                         // Set IMAGE_TAG as an environment variable
                         env.IMAGE_TAG = "v1.0.0-${BUILD_NUMBER}-${GIT_TAG}"
                         // Login to Dockerhub / Nexus repo ,tag, and push images
