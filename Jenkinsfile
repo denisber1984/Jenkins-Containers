@@ -52,15 +52,45 @@ pipeline {
             }
         }
 
-        stage('Unittest') {
-            steps {
-                script {
-                    def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
-                        sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
+        stage('Parallel Test and Linting') {
+            parallel {
+                stage('Unittest') {
+                    steps {
+                        script {
+                            def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                            docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
+                                sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
+                            }
+                        }
+                        junit 'results.xml'
                     }
                 }
-                junit 'results.xml'
+
+                stage('Static code linting') {
+                    steps {
+                        script {
+                            def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                            docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
+                                sh 'python3 -m pylint -f parseable --reports=no *.py > pylint.log'
+                            }
+                        }
+                    }
+                    post {
+                        always {
+                            script {
+                                def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                                docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
+                                    sh 'cat pylint.log'
+                                    recordIssues(
+                                        enabledForFailure: true,
+                                        aggregatingResults: true,
+                                        tools: [pyLint(name: 'Pylint', pattern: '**/pylint.log')]
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
 
