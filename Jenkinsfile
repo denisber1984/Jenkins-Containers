@@ -71,7 +71,7 @@ pipeline {
                         script {
                             def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
                             docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
-                                sh 'python3 -m pylint -f parseable --reports=no *.py > pylint.log'
+                                sh 'python3 -m pylint -f parseable --reports=no polybot/*.py > pylint.log'
                             }
                         }
                     }
