@@ -3,7 +3,7 @@
 pipeline {
     agent {
         docker {
-            image 'denisber1984/jenkins-agent:latest'
+            image '<your-dockerhub-username>/jenkins-agent:latest'
             args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
         }
     }
@@ -33,6 +33,9 @@ pipeline {
         stage('Checkout SCM') {
             steps {
                 checkout scm
+                script {
+                    sh 'git config --global --add safe.directory /var/lib/jenkins/workspace/mypolybot-pipeline'
+                }
             }
         }
 
