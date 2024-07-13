@@ -72,7 +72,7 @@ pipeline {
                     script {
                         def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
                         sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@ ec2-3-125-33-156.eu-central-1.compute.amazonaws.com'
+                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-3-125-33-156.eu-central-1.compute.amazonaws.com'
                                 docker login -u admin -p ${NEXUS_CREDENTIALS_PSW} http://${NEXUS_URL}
                                 docker pull ${NEXUS_URL}/repository/${NEXUS_REPO}:latest
                                 docker stop mypolybot-app || true
