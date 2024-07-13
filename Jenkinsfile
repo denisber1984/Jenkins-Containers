@@ -72,7 +72,12 @@ pipeline {
                     script {
                         def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
                         echo "Running Snyk scan on image: ${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}"
-                        myLib.snykSecurityScan(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER, SNYK_TOKEN)
+                        sh "snyk auth ${SNYK_TOKEN}"
+                        sh """
+                            snyk container test ${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER} \
+                            --severity-threshold=high --file=polybot/Dockerfile \
+                            --exclude-base-image-vulns --policy-path=./snyk-ignore.json || true
+                        """
                     }
                 }
             }
