@@ -35,7 +35,7 @@ pipeline {
             steps {
                 script {
                     def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    docker.build("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}", "-f polybot/Dockerfile polybot")
+                    myLib.buildDockerImage(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER)
                 }
             }
         }
@@ -44,52 +44,16 @@ pipeline {
             steps {
                 script {
                     def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    docker.withRegistry("http://${NEXUS_URL}", 'nexus-credentials') {
-                        docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").push()
-                        docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").push('latest')
-                    }
+                    myLib.pushDockerImage(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER)
                 }
             }
         }
 
-        stage('Parallel Test and Linting') {
-            parallel {
-                stage('Unittest') {
-                    steps {
-                        script {
-                            def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                            docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
-                                sh 'python3 -m pytest --junitxml=results.xml tests/test.py'
-                            }
-                        }
-                        junit 'results.xml'
-                    }
-                }
-
-                stage('Static code linting') {
-                    steps {
-                        script {
-                            def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                            docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
-                                sh 'python3 -m pylint -f parseable --reports=no polybot/*.py > pylint.log'
-                            }
-                        }
-                    }
-                    post {
-                        always {
-                            script {
-                                def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                                docker.image("${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER}").inside {
-                                    sh 'cat pylint.log'
-                                    recordIssues(
-                                        enabledForFailure: true,
-                                        aggregatingResults: true,
-                                        tools: [pyLint(name: 'Pylint', pattern: '**/pylint.log')]
-                                    )
-                                }
-                            }
-                        }
-                    }
+        stage('Unittest') {
+            steps {
+                script {
+                    def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                    myLib.runUnitTests(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER)
                 }
             }
         }
@@ -99,8 +63,7 @@ pipeline {
                 withCredentials([string(credentialsId: 'snyk-api-token', variable: 'SNYK_TOKEN')]) {
                     script {
                         def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                        sh "snyk auth ${SNYK_TOKEN}"
-                        sh "snyk container test ${NEXUS_URL}/repository/${NEXUS_REPO}:${commitId}-${env.BUILD_NUMBER} --severity-threshold=high --file=polybot/Dockerfile --exclude-base-image-vulns --policy-path=./snyk-ignore.json"
+                        myLib.snykSecurityScan(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER, SNYK_TOKEN)
                     }
                 }
             }
@@ -111,15 +74,7 @@ pipeline {
                 sshagent(['ec2-ssh-credentials']) {
                     script {
                         def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                        sh """
-                            ssh -o StrictHostKeyChecking=no ec2-user@ec2-3-125-33-156.eu-central-1.compute.amazonaws.com '
-                                docker login -u admin -p ${NEXUS_CREDENTIALS_PSW} http://${NEXUS_URL}
-                                docker pull ${NEXUS_URL}/repository/${NEXUS_REPO}:latest
-                                docker stop mypolybot-app || true
-                                docker rm mypolybot-app || true
-                                docker run -d --name mypolybot-app -p 80:80 ${NEXUS_URL}/repository/${NEXUS_REPO}:latest
-                            '
-                        """
+                        myLib.deployApplication(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER, NEXUS_CREDENTIALS_PSW, 'ec2-3-125-33-156.eu-central-1.compute.amazonaws.com')
                     }
                 }
             }
