@@ -1,7 +1,12 @@
 @Library('jenkins-shared-library') _
 
 pipeline {
-    agent any
+    agent {
+        docker {
+            image 'denisber1984/jenkins-agent:latest'
+            args '--user root -v /var/run/docker.sock:/var/run/docker.sock'
+        }
+    }
 
     environment {
         DOCKER_HUB_CREDENTIALS = credentials('dockerhub')
