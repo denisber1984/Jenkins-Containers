@@ -1,3 +1,5 @@
+@Library('jenkins-shared-library') _
+
 pipeline {
     agent any
 
@@ -15,6 +17,14 @@ pipeline {
     }
 
     stages {
+        stage('Say Hello') {
+            steps {
+                script {
+                    myLib.sayHello('Den')
+                }
+            }
+        }
+
         stage('Checkout SCM') {
             steps {
                 checkout scm
