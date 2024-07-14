@@ -57,11 +57,23 @@ pipeline {
             }
         }
 
-        stage('Unittest') {
-            steps {
-                script {
-                    def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                    myLib.runUnitTests(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER)
+        stage('Parallel Test and Linting') {
+            parallel {
+                stage('Unittest') {
+                    steps {
+                        script {
+                            def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                            myLib.runUnitTests(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER)
+                        }
+                    }
+                }
+                stage('Linting') {
+                    steps {
+                        script {
+                            def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
+                            myLib.runLinting(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER)
+                        }
+                    }
                 }
             }
         }
