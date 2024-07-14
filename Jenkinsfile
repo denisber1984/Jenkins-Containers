@@ -105,7 +105,7 @@ pipeline {
                 sshagent(['ec2-ssh-credentials']) {
                     script {
                         def commitId = sh(returnStdout: true, script: 'git rev-parse --short HEAD').trim()
-                        myLib.deployApplication(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER, NEXUS_CREDENTIALS_PSW, 'ec2-3-125-33-156.eu-central-1.compute.amazonaws.com')
+                        myLib.deployApplication(NEXUS_URL, NEXUS_REPO, commitId, env.BUILD_NUMBER, NEXUS_CREDENTIALS_PSW, 'ec2-18-195-199-70.eu-central-1.compute.amazonaws.com')
                     }
                 }
             }
